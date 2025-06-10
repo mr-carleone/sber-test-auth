@@ -1,0 +1,21 @@
+services:
+  backend:
+    build: ./backend
+    env_file:
+      - ./backend/app/configs/.env.${ENV_MODE:-dev}
+    environment:
+      - PRIVATE_KEY_PATH=/app/private_key.pem
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8000
+    volumes:
+      - ./backend/app/private_key.pem:/app/private_key.pem
+      - ./backend/app:/app
+    expose:
+      - "8000"
+
+  nginx:
+    build: ./nginx
+    ports:
+      - "443:443"
+    depends_on:
+      - backend
