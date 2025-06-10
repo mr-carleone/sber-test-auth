@@ -8,4 +8,4 @@ venv/
 env/
 .vscode
 backend/app/configs/*
-backend/app/private_pem.key
+backend/app/private_key.pem
