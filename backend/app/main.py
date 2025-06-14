@@ -1,10 +1,12 @@
 # app/main.py
-import time
-from fastapi import FastAPI, Request
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse, Response
 from pathlib import Path
 from core.config import settings
 from core.logging import setup_logging
-from apscheduler.schedulers.background import BackgroundScheduler
+from core.middleware import setup_middleware
 from core.storage import storage
 # Импорт роутеров после инициализации логгера
 from routes.auth_routes import router as auth_router, refresh_access_token, update_client_secret
@@ -12,6 +14,8 @@ from routes.statements_routes import router as statements_router
 
 # Инициализация логирования
 setup_logging()
+
+logger = logging.getLogger(__name__)
 
 # Проверка существования ключа
 if settings.ENV.lower() != "dev":
@@ -23,53 +27,75 @@ if settings.ENV.lower() != "dev":
         logger.critical(f"Private key path is not a file: {key_path}")
         raise SystemExit(1)
 
+# Инициализация планировщика
+scheduler = BackgroundScheduler() # type: ignore
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        # Запуск планировщика при старте
+        scheduler.start() # type: ignore
+        yield
+    finally:
+        # Остановка планировщика при завершении
+        scheduler.shutdown() # type: ignore
+
 # Создание приложения
 app = FastAPI(
     title="Sber OAuth Service",
     debug=not settings.is_production,
     docs_url="/docs" if not settings.is_production else None,
-    redoc_url="/redoc" if not settings.is_production else None
+    redoc_url="/redoc" if not settings.is_production else None,
+    lifespan=lifespan
 )
+
+# Настройка middleware
+setup_middleware(app)
+
+# Глобальный обработчик ошибок
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    logger.error(f"HTTP exception: {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(statements_router, prefix="/api/v1")
 
-# Инициализация планировщика
-scheduler = BackgroundScheduler()
-
 # Проверка и обновление токена каждые 30 минут
-@scheduler.scheduled_job('interval', minutes=30)
+@scheduler.scheduled_job('interval', minutes=30)  # type: ignore
 def scheduled_token_refresh():
     if storage.refresh_token and storage.access_token_expired:
-        # Для асинхронных функций используем asyncio.run в синхронном контексте
         import asyncio
         asyncio.run(refresh_access_token())
 
 # Проверка client_secret каждые 12 часов
-@scheduler.scheduled_job('interval', hours=12)
+@scheduler.scheduled_job('interval', hours=12)  # type: ignore
 def scheduled_secret_check():
     if storage.client_secret_expires_soon:
         logger.warning("Client secret expires soon, updating...")
         import asyncio
         asyncio.run(update_client_secret())
 
-scheduler.start()
-
-# Остановка планировщика при завершении
-@app.on_event("shutdown")
-def shutdown_event():
-    scheduler.shutdown()
-
 # Добавим middleware для автоматического обновления токена
 @app.middleware("http")
-async def auto_refresh_token(request: Request, call_next):
-    # Если токен просрочен и есть refresh_token
+async def auto_refresh_token(request: Request, call_next) -> Response: # type: ignore
     if storage.access_token_expired and storage.refresh_token:
         logger.warning("Access token expired, refreshing...")
         await refresh_access_token()
 
-    response = await call_next(request)
-    return response
+    response = await call_next(request) # type: ignore
+    return response # type: ignore
 
 @app.get("/api/v1/")
 async def root():

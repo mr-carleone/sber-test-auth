@@ -3,7 +3,6 @@ from fastapi import APIRouter, HTTPException
 import httpx
 import logging
 from core.storage import storage
-from core.config import settings
 from core.utils import sign_data
 
 router = APIRouter() # сюда добавить api/v1 или вынести в системную переменную?? description

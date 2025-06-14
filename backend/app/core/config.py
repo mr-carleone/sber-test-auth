@@ -1,35 +1,47 @@
 # app/core/config.py
 import os
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic_settings import BaseSettings
+from pydantic import HttpUrl, field_validator, computed_field
+from typing import List, Any
 import logging
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-ENV_VALUE = os.getenv('ENV', 'dev')
-ENV_FILE_PATH = f"/app/configs/.env.{ENV_VALUE}"
-
 class Settings(BaseSettings):
-    ENV: str = Field("dev", env="ENV")
-    LOG_LEVEL: str = Field("INFO", env="LOG_LEVEL")
-    CLIENT_ID: str = Field(..., env="CLIENT_ID")
-    CLIENT_SECRET: str = Field(..., env="CLIENT_SECRET")
-    REDIRECT_URI: str = Field(..., env="REDIRECT_URI")
-    PRIVATE_KEY_PATH: str = Field(..., env="PRIVATE_KEY_PATH")
-    APP_HOST: str = Field("0.0.0.0", env="APP_HOST")
-    APP_PORT: int = Field(8000, env="APP_PORT")
+    # Основные настройки
+    ENV: str = "dev"
+    LOG_LEVEL: str = "INFO"
+    APP_HOST: str = "0.0.0.0"
+    APP_PORT: int = 8000
 
-    # Конфигурация модели
-    model_config = SettingsConfigDict(
-        env_file=ENV_FILE_PATH,
-        env_file_encoding="utf-8",
-        extra="ignore",
-        validate_assignment=True
-    )
+    # OAuth настройки
+    CLIENT_ID: str
+    CLIENT_SECRET: str
+    REDIRECT_URI: HttpUrl
+    PRIVATE_KEY_PATH: str
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    # Настройки безопасности
+    ALLOWED_ORIGINS: List[str] = ["*"]
+    RATE_LIMIT_PER_MINUTE: int = 60
+    JWT_SECRET_KEY: str
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    @computed_field
+    @property
+    def is_production(self) -> bool:
+        return self.ENV.lower() == "prod"
+
+    @field_validator("REDIRECT_URI", mode="before")
+    @classmethod
+    def validate_redirect_uri(cls, v: Any) -> HttpUrl:
+        if isinstance(v, HttpUrl):
+            return v
+        return HttpUrl(v)
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         logger.info(f"Environment: {self.ENV}")
         logger.info(f"Private key path: {self.PRIVATE_KEY_PATH}")
 
@@ -40,9 +52,11 @@ class Settings(BaseSettings):
         else:
             logger.warning(f"Private key file does NOT exist at: {key_path}")
 
-    @property
-    def is_production(self):
-        return self.ENV.lower() == "prod"
+    class Config:
+        env_file = f"/app/configs/.env.{os.getenv('ENV', 'dev')}"
+        env_file_encoding = "utf-8"
+        extra = "ignore"
+        validate_assignment = True
 
 # Initialize settings
 settings = Settings()

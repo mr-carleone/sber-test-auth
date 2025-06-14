@@ -1,16 +1,13 @@
 # app/routes/auth_routes.py
-import os
-import base64
 import httpx
 import logging
-import time
 from core.utils import sign_data
 from fastapi import APIRouter, Request, HTTPException
 from core.config import settings
 from core.storage import storage
 
 
-router = APIRouter() # сюда добавить api/v1 или вынести в системную переменную?? description
+router = APIRouter()
 logger = logging.getLogger(__name__)
 
 @router.get("/login")

@@ -61,27 +61,28 @@ class TokenStorage:
 
     @property
     def access_token(self) -> str:
-        return self.data.get("access_token", "")
+        return str(self.data.get("access_token", ""))
 
     @property
     def refresh_token(self) -> str:
-        return self.data.get("refresh_token", "")
+        return str(self.data.get("refresh_token", ""))
 
     @property
     def client_secret(self) -> str:
-        return self.data.get("client_secret", settings.CLIENT_SECRET)
+        from core.config import settings
+        return str(self.data.get("client_secret", settings.CLIENT_SECRET))
 
     @property
     def access_token_expired(self) -> bool:
-        return time.time() > self.data.get("expires_at", 0)
+        return time.time() > float(self.data.get("expires_at", 0))
 
     @property
     def client_secret_expired(self) -> bool:
-        return time.time() > self.data.get("secret_expires_at", 0)
+        return time.time() > float(self.data.get("secret_expires_at", 0))
 
     @property
     def client_secret_expires_soon(self) -> bool:
         # Предупреждение за 5 дней до истечения
-        return time.time() > (self.data.get("secret_expires_at", 0) - (5 * 24 * 3600))
+        return time.time() > (float(self.data.get("secret_expires_at", 0)) - (5 * 24 * 3600))
 
 storage = TokenStorage()
