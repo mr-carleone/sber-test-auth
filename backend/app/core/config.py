@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     CLIENT_SECRET: str
     REDIRECT_URI: HttpUrl
     PRIVATE_KEY_PATH: str
+    SCOPE: str
+    SBER_AUTH_URL: str
 
     # Настройки безопасности
     ALLOWED_ORIGINS: List[str] = ["*"]
