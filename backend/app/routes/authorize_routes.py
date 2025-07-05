@@ -2,9 +2,11 @@ import uuid
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 from urllib.parse import urlencode
-from app.core.config import settings
+from core.config import get_settings
 
 router = APIRouter(prefix="/api/v1/authorize", tags=["Sber OAuth Authorize"])
+
+settings = get_settings()
 
 @router.get("")
 def get_authorize_url(request: Request):

@@ -1,8 +1,9 @@
 # app/core/config.py
 import os
 from pydantic_settings import BaseSettings
-from pydantic import HttpUrl, field_validator, computed_field
+from pydantic import HttpUrl, field_validator, computed_field, TypeAdapter
 from typing import List, Any
+from functools import lru_cache
 import logging
 from pathlib import Path
 
@@ -36,11 +37,8 @@ class Settings(BaseSettings):
         return self.ENV.lower() == "prod"
 
     @field_validator("REDIRECT_URI", mode="before")
-    @classmethod
     def validate_redirect_uri(cls, v: Any) -> HttpUrl:
-        if isinstance(v, HttpUrl):
-            return v
-        return HttpUrl(v)
+        return TypeAdapter(HttpUrl).validate_python(v)
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
@@ -60,5 +58,6 @@ class Settings(BaseSettings):
         extra = "ignore"
         validate_assignment = True
 
-# Initialize settings
-settings = Settings()
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()
