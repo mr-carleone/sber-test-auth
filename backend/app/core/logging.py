@@ -1,7 +1,9 @@
 # src/core/logging.py
 import logging
 from colorlog import ColoredFormatter
-from .config import settings
+from .config import get_settings
+
+settings = get_settings()
 
 def setup_logging():
     # Установка уровня логирования
